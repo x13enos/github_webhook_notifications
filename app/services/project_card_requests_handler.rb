@@ -7,7 +7,6 @@ class ProjectCardRequestsHandler
 
   def perform
     find_initiator
-    select_action
     get_column_name
     get_recipients
     send_email
@@ -16,18 +15,12 @@ class ProjectCardRequestsHandler
   private
 
   def find_initiator
-    user_url = @payload["sender"]["url"]
     user_response = HTTParty.get(user_url, request_params)
     @initiator_login = user_response["login"]
     @initiator_name = user_response["name"] || @initiator_login
   end
 
-  def select_action
-    @action = @payload["action"]
-  end
-
   def get_column_name
-    column_url = @payload["project_card"]["column_url"]
     column_response = HTTParty.get(column_url, request_params)
     @column_name = column_response["name"]
   end
@@ -41,16 +34,39 @@ class ProjectCardRequestsHandler
   end
 
   def send_email
-    case @action
+    case action
     when 'created'
       send_email_of_creating
+    when 'moved'
+      send_email_of_moving
+    when 'edited'
+      send_email_of_editing
+    when 'deleted'
+      send_email_of_deleting
     end
   end
 
   def send_email_of_creating
-    note_text = @payload["project_card"]["note"]
     @recipients.except(@initiator_login).each do |login, mail|
       NotificationMailer.project_card_creation(mail, @initiator_name, @column_name, note_text).deliver!
+    end
+  end
+
+  def send_email_of_moving
+    @recipients.except(@initiator_login).each do |login, mail|
+      NotificationMailer.project_card_moving(mail, @initiator_name, @column_name, note_text).deliver!
+    end
+  end
+
+  def send_email_of_editing
+    @recipients.except(@initiator_login).each do |login, mail|
+      NotificationMailer.project_card_editing(mail, @initiator_name, @column_name, note_text, old_note_text).deliver!
+    end
+  end
+
+  def send_email_of_deleting
+    @recipients.except(@initiator_login).each do |login, mail|
+      NotificationMailer.project_card_deleting(mail, @initiator_name, @column_name, note_text).deliver!
     end
   end
 
@@ -62,5 +78,25 @@ class ProjectCardRequestsHandler
       },
       basic_auth: { username: ENV["GITHUB_USER"], password: ENV["GITHUB_TOKEN"] }
     }
+  end
+
+  def note_text
+    @payload["project_card"]["note"]
+  end
+
+  def column_url
+    @payload["project_card"]["column_url"]
+  end
+
+  def action
+    @payload["action"]
+  end
+
+  def user_url
+    @payload["sender"]["url"]
+  end
+
+  def old_note_text
+    @payload["changes"]["note"]["from"]
   end
 end
