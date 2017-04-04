@@ -9,6 +9,7 @@ class ProjectCardRequestsHandler
     find_initiator
     get_column_name
     get_recipients
+    get_project_url
     send_email
   end
 
@@ -21,8 +22,8 @@ class ProjectCardRequestsHandler
   end
 
   def get_column_name
-    column_response = HTTParty.get(column_url, request_params)
-    @column_name = column_response["name"]
+    @column_response = HTTParty.get(column_url, request_params)
+    @column_name = @column_response["name"]
   end
 
   def get_recipients
@@ -31,6 +32,11 @@ class ProjectCardRequestsHandler
       recipient = r.split(":")
       o[recipient[0]] = recipient[1]
     end
+  end
+
+  def get_project_url
+    project_response = HTTParty.get(@column_response["project_url"], request_params)
+    @project_url = project_response["html_url"]
   end
 
   def send_email
@@ -48,25 +54,25 @@ class ProjectCardRequestsHandler
 
   def send_email_of_creating
     @recipients.except(@initiator_login).each do |login, mail|
-      NotificationMailer.project_card_creation(mail, @initiator_name, @column_name, note_text).deliver!
+      NotificationMailer.project_card_creation(mail, @initiator_name, @project_url, @column_name, note_text).deliver!
     end
   end
 
   def send_email_of_moving
     @recipients.except(@initiator_login).each do |login, mail|
-      NotificationMailer.project_card_moving(mail, @initiator_name, @column_name, note_text).deliver!
+      NotificationMailer.project_card_moving(mail, @initiator_name, @project_url, @column_name, note_text).deliver!
     end
   end
 
   def send_email_of_editing
     @recipients.except(@initiator_login).each do |login, mail|
-      NotificationMailer.project_card_editing(mail, @initiator_name, @column_name, note_text, old_note_text).deliver!
+      NotificationMailer.project_card_editing(mail, @initiator_name, @project_url, @column_name, note_text, old_note_text).deliver!
     end
   end
 
   def send_email_of_deleting
     @recipients.except(@initiator_login).each do |login, mail|
-      NotificationMailer.project_card_deleting(mail, @initiator_name, @column_name, note_text).deliver!
+      NotificationMailer.project_card_deleting(mail, @initiator_name, @project_url, @column_name, note_text).deliver!
     end
   end
 
